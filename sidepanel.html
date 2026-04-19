@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GPT in Chrome</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand-copy">
+          <div class="brand-line">
+            <div class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none">
+                <g fill="currentColor">
+                  <rect x="22" y="1.5" width="4" height="14" rx="2"></rect>
+                  <rect x="22" y="32.5" width="4" height="14" rx="2"></rect>
+                  <rect x="32.5" y="22" width="14" height="4" rx="2"></rect>
+                  <rect x="1.5" y="22" width="14" height="4" rx="2"></rect>
+                  <rect x="29.61" y="6.68" width="4" height="14" rx="2" transform="rotate(45 29.61 6.68)"></rect>
+                  <rect x="7.68" y="28.61" width="4" height="14" rx="2" transform="rotate(45 7.68 28.61)"></rect>
+                  <rect x="28.61" y="40.32" width="4" height="14" rx="2" transform="rotate(135 28.61 40.32)"></rect>
+                  <rect x="6.68" y="18.39" width="4" height="14" rx="2" transform="rotate(135 6.68 18.39)"></rect>
+                  <circle cx="24" cy="24" r="6.5"></circle>
+                </g>
+              </svg>
+            </div>
+            <div class="brand-titles">
+              <p class="app-title">GPT in Chrome</p>
+            </div>
+          </div>
+          <div class="page-chip">
+            <strong id="page-chip-label">Page</strong>
+            <span id="tab-title">Current Page</span>
+            <span id="tab-url"></span>
+          </div>
+        </div>
+      </header>
+
+      <div id="notice" class="notice hidden"></div>
+
+      <section class="chat-shell">
+        <div class="chat-topbar">
+          <label class="model-picker" for="model-select">
+            <select id="model-select" class="model-select"></select>
+          </label>
+          <div class="chat-topbar-actions">
+            <button id="new-session-button" class="header-icon-button" type="button" aria-label="New Session" title="New Session">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M8.25 17.5H6.75C5.50736 17.5 4.5 16.4926 4.5 15.25V8.75C4.5 7.50736 5.50736 6.5 6.75 6.5H15.25C16.4926 6.5 17.5 7.50736 17.5 8.75V10.25"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M9.5 17.5L8 19V17.5"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M14.75 14.5V19.5M12.25 17H17.25"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+            <button id="history-button" class="header-icon-button" type="button" aria-label="History" title="History">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M4.75 12A7.25 7.25 0 1 0 7 6.74"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M4.75 4.75V8.5H8.5"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M12 8.2V12.15L14.95 13.95"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <button id="settings-button" class="header-icon-button" type="button" aria-label="Settings" title="Settings">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="5" r="1.7" fill="currentColor" />
+                <circle cx="12" cy="12" r="1.7" fill="currentColor" />
+                <circle cx="12" cy="19" r="1.7" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <section id="tools-sheet" class="tools-sheet hidden">
+          <div class="tool-grid">
+            <button id="refresh-tab-button" class="tool-button" type="button">Sync Page</button>
+            <button id="capture-visible-button" class="tool-button" type="button">Capture</button>
+            <button id="capture-full-button" class="tool-button" type="button">Full Page</button>
+            <button id="console-logs-button" class="tool-button" type="button">Console</button>
+          </div>
+
+          <label class="switch-row">
+            <span id="page-context-label">Attach page by default</span>
+            <input id="page-context-toggle" type="checkbox" />
+          </label>
+
+          <details class="inline-console">
+            <summary id="console-summary">Page Script</summary>
+            <label class="field">
+              <span id="console-label">JavaScript</span>
+              <textarea
+                id="console-input"
+                rows="4"
+                placeholder="document.title&#10;document.querySelector('button')?.innerText"
+              ></textarea>
+            </label>
+            <div class="inline-actions">
+              <button id="run-console-button" class="secondary-button" type="button">Run</button>
+            </div>
+            <pre id="console-output" class="console-output">Ready</pre>
+          </details>
+        </section>
+
+        <section id="history-sheet" class="history-sheet hidden" aria-label="Recent sessions">
+          <div class="history-sheet-header">
+            <p id="history-label" class="history-label">Recent sessions</p>
+          </div>
+          <div id="history-list" class="history-list"></div>
+          <p id="history-empty" class="history-empty hidden">No saved sessions yet</p>
+        </section>
+
+        <section id="approval-panel" class="approval-banner hidden">
+          <div class="approval-copy">
+            <span id="approval-kicker" class="approval-kicker">Approval</span>
+            <strong id="approval-title"></strong>
+            <p id="approval-detail"></p>
+          </div>
+          <div class="approval-actions">
+            <button id="reject-approval-button" class="secondary-button" type="button">Reject</button>
+            <button id="approve-approval-button" class="primary-button" type="button">Run</button>
+          </div>
+        </section>
+
+        <div id="empty-state" class="empty-state">
+          <p id="empty-state-text">Start a new session</p>
+        </div>
+
+        <main id="messages" class="messages"></main>
+
+        <footer class="composer">
+          <section id="attachments" class="attachments"></section>
+          <div class="composer-surface">
+            <textarea
+              id="prompt-input"
+              rows="1"
+              placeholder="Reply to GPT in Chrome"
+            ></textarea>
+            <div class="composer-bottom">
+              <button id="approval-mode-button" class="composer-mode-button" type="button" aria-label="Ask First" title="Ask First">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M8.5 11.25V6.5A1.75 1.75 0 0 1 12 6.5V10"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M12 10V5.5A1.75 1.75 0 0 1 15.5 5.5V10.25"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M15.5 10.25V7.25A1.75 1.75 0 1 1 19 7.25V13.25C19 16.0114 16.7614 18.25 14 18.25H12.65C11.1903 18.25 9.79685 17.6502 8.81778 16.5915L6.75 14.3542A1.65 1.65 0 0 1 9.11 12.055L10 12.95V11.25"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span id="approval-mode-text">Ask First</span>
+                <svg class="composer-caret" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M4.5 6.5L8 10L11.5 6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+              <div class="composer-actions">
+                <button id="tools-button" class="composer-icon-button" type="button" aria-label="Tools" title="Tools">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button id="send-button" class="send-icon-button" type="button" aria-label="Send" title="Send">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 16V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    <path d="M8.5 11.5L12 8L15.5 11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <div id="settings-overlay" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <button id="settings-close-button" class="modal-close" type="button" aria-label="Close">×</button>
+
+        <div class="step-dots">
+          <span class="step-dot" data-step-dot="0"></span>
+          <span class="step-dot" data-step-dot="1"></span>
+        </div>
+
+        <section id="welcome-step" class="modal-step">
+          <p id="welcome-kicker" class="modal-kicker">Welcome</p>
+          <h1 id="welcome-title">Bring GPT into Chrome.</h1>
+          <p id="welcome-copy" class="modal-copy">Connect any OpenAI-compatible API, then let it read pages, capture screenshots, inspect console output, and act on the web.</p>
+
+          <div class="feature-list">
+            <span id="feature-read">Page Read</span>
+            <span id="feature-screenshot">Screenshot</span>
+            <span id="feature-actions">Web Actions</span>
+          </div>
+
+          <div class="modal-actions">
+            <button id="onboarding-next-button" class="primary-button" type="button">Set Up</button>
+          </div>
+        </section>
+
+        <section id="connect-step" class="modal-step hidden">
+          <p id="connect-kicker" class="modal-kicker">Connection</p>
+          <h2 id="connect-title">OpenAI-Compatible API</h2>
+
+          <label class="field">
+            <span id="base-url-label">Base URL</span>
+            <input id="base-url-input" type="text" placeholder="https://api.openai.com/v1" />
+          </label>
+
+          <label class="field">
+            <span id="endpoint-path-label">Endpoint Path</span>
+            <input id="endpoint-path-input" type="text" placeholder="chat/completions" />
+          </label>
+
+          <label class="field">
+            <span id="api-key-label">API Key</span>
+            <input id="api-key-input" type="password" placeholder="sk-..." />
+          </label>
+
+          <label class="field">
+            <span id="models-label">Models</span>
+            <textarea
+              id="models-input"
+              rows="5"
+              placeholder="gpt-4.1-mini&#10;gpt-4.1&#10;o4-mini"
+            ></textarea>
+            <small id="models-note" class="field-note">One model per line, switch from the top picker.</small>
+          </label>
+
+          <label class="field">
+            <span id="language-label">Language</span>
+            <select id="settings-language">
+              <option id="language-option-auto" value="auto">Follow browser</option>
+              <option id="language-option-zh" value="zh">简体中文</option>
+              <option id="language-option-en" value="en">English</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span id="action-mode-label">Action Mode</span>
+            <select id="settings-approval-mode">
+              <option id="approval-option-ask" value="ask">Ask First</option>
+              <option id="approval-option-auto" value="auto">Auto Run</option>
+            </select>
+          </label>
+
+          <label class="switch-row roomy">
+            <span id="settings-include-context-label">Attach page by default</span>
+            <input id="settings-include-context" type="checkbox" />
+          </label>
+
+          <details class="advanced-settings">
+            <summary id="advanced-summary">Advanced</summary>
+            <label class="field">
+              <span id="system-prompt-label">System Prompt</span>
+              <textarea id="system-prompt-input" rows="6"></textarea>
+            </label>
+          </details>
+
+          <div class="modal-actions split">
+            <button id="onboarding-back-button" class="secondary-button" type="button">Back</button>
+            <button id="save-settings-button" class="primary-button" type="button">Start</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
