@@ -106,6 +106,7 @@
 
         <section id="tools-sheet" class="tools-sheet hidden">
           <div class="tool-grid">
+            <button id="add-image-button" class="tool-button" type="button">Add Image</button>
             <button id="refresh-tab-button" class="tool-button" type="button">Sync Page</button>
             <button id="capture-visible-button" class="tool-button" type="button">Capture</button>
             <button id="capture-full-button" class="tool-button" type="button">Full Page</button>
@@ -162,6 +163,7 @@
 
         <footer class="composer">
           <section id="attachments" class="attachments"></section>
+          <input id="image-input" class="hidden-file-input" type="file" accept="image/*" multiple />
           <div class="composer-surface">
             <textarea
               id="prompt-input"

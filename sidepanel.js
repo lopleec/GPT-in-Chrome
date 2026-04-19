@@ -22,6 +22,7 @@ const HISTORY_STORAGE_KEY = "chatHistoryV1";
 const MAX_HISTORY_SESSIONS = 24;
 const MAX_SESSION_MESSAGES = 120;
 const MAX_STORED_TEXT_LENGTH = 16000;
+const MAX_ATTACHMENTS = 6;
 
 const TRANSLATIONS = {
   en: {
@@ -30,6 +31,7 @@ const TRANSLATIONS = {
     newSession: "New Session",
     settings: "Settings",
     syncPage: "Sync Page",
+    addImage: "Add Image",
     captureVisible: "Capture",
     captureFull: "Full Page",
     consoleLogs: "Console",
@@ -82,12 +84,17 @@ const TRANSLATIONS = {
     settingsSavedNotice: "Settings saved.",
     newSessionNotice: "New session started.",
     writeJsNotice: "Write some JavaScript first.",
-    writePromptNotice: "Tell GPT what to do first.",
+    writePromptNotice: "Tell GPT what to do, or attach an image first.",
     finishSetupNotice: "Finish API setup first.",
     waitingApprovalNotice: "Waiting for approval before acting.",
     readTabFailed: "Failed to read tab.",
     captureFailed: "Capture failed.",
     screenshotAttached: "Screenshot attached.",
+    imageAttached: "Image attached.",
+    imagesAttached: "{count} images attached.",
+    attachmentLimitNotice: "You can attach up to {count} images.",
+    imageOnlyNotice: "Only image files are supported.",
+    imageReadFailed: "Failed to read image.",
     consoleReadFailed: "Console read failed.",
     runFailed: "Run failed.",
     modelNoMessage: "Model returned no usable message.",
@@ -96,6 +103,8 @@ const TRANSLATIONS = {
     pageAttached: "Page attached",
     attachmentVisible: "Capture",
     attachmentFull: "Full Page",
+    attachmentImage: "Image",
+    attachmentPasted: "Pasted image",
     remove: "Remove",
     history: "History",
     recentSessions: "Recent sessions",
@@ -113,6 +122,7 @@ const TRANSLATIONS = {
     newSession: "新会话",
     settings: "设置",
     syncPage: "同步页面",
+    addImage: "添加图片",
     captureVisible: "可视截图",
     captureFull: "整页截图",
     consoleLogs: "读取控制台",
@@ -164,12 +174,17 @@ const TRANSLATIONS = {
     settingsSavedNotice: "设置已保存。",
     newSessionNotice: "已开始新会话。",
     writeJsNotice: "先写一段 JS。",
-    writePromptNotice: "先写点任务给我。",
+    writePromptNotice: "先写点任务，或者先附上一张图片。",
     finishSetupNotice: "先把接口配置好。",
     waitingApprovalNotice: "模型准备操作网页，等你确认。",
     readTabFailed: "读取标签页失败。",
     captureFailed: "截图失败。",
     screenshotAttached: "截图已附加到当前会话。",
+    imageAttached: "图片已附加到当前会话。",
+    imagesAttached: "已附加 {count} 张图片。",
+    attachmentLimitNotice: "最多只能附加 {count} 张图片。",
+    imageOnlyNotice: "这里只支持图片文件。",
+    imageReadFailed: "读取图片失败。",
     consoleReadFailed: "读取控制台失败。",
     runFailed: "运行失败。",
     modelNoMessage: "模型没有返回可用消息。",
@@ -178,6 +193,8 @@ const TRANSLATIONS = {
     pageAttached: "已附带页面上下文",
     attachmentVisible: "可视截图",
     attachmentFull: "整页截图",
+    attachmentImage: "图片",
+    attachmentPasted: "剪贴板图片",
     remove: "移除",
     history: "历史记录",
     recentSessions: "最近会话",
@@ -454,7 +471,7 @@ const state = {
   currentSessionId: "",
   sessions: [],
   messages: [],
-  attachment: null,
+  attachments: [],
   tab: null,
   pending: null,
   isBusy: false,
@@ -496,6 +513,7 @@ function cacheElements() {
     "history-sheet",
     "history-empty",
     "tools-button",
+    "add-image-button",
     "refresh-tab-button",
     "model-select",
     "new-session-button",
@@ -528,6 +546,7 @@ function cacheElements() {
     "history-list",
     "messages",
     "attachments",
+    "image-input",
     "prompt-input",
     "send-button",
     "settings-overlay",
@@ -600,11 +619,16 @@ function bindEvents() {
     event.stopPropagation();
     toggleTools(!state.toolsOpen);
   });
+  els["add-image-button"].addEventListener("click", () => {
+    toggleTools(false);
+    openImagePicker();
+  });
   els["capture-visible-button"].addEventListener("click", () => captureScreenshot("visible"));
   els["capture-full-button"].addEventListener("click", () => captureScreenshot("full"));
   els["console-logs-button"].addEventListener("click", loadConsoleLogs);
   els["run-console-button"].addEventListener("click", runManualConsole);
   els["send-button"].addEventListener("click", sendPrompt);
+  els["image-input"].addEventListener("change", handleImageInputChange);
   els["approve-approval-button"].addEventListener("click", approvePendingAction);
   els["reject-approval-button"].addEventListener("click", rejectPendingAction);
   els["settings-close-button"].addEventListener("click", closeSettingsOverlay);
@@ -651,6 +675,7 @@ function bindEvents() {
   });
 
   els["prompt-input"].addEventListener("input", autoResizePrompt);
+  els["prompt-input"].addEventListener("paste", handlePromptPaste);
 
   document.addEventListener("click", (event) => {
     if (state.toolsOpen) {
@@ -721,6 +746,7 @@ function truncateText(value, maxLength = MAX_STORED_TEXT_LENGTH) {
 function normalizeMessage(message) {
   return {
     ...message,
+    attachmentCount: Number(message.attachmentCount) || 0,
     id: message.id || createId("msg")
   };
 }
@@ -772,7 +798,8 @@ function serializeMessageForStorage(message) {
     tool_call_id: message.tool_call_id || "",
     timestamp: message.timestamp || new Date().toISOString(),
     contextIncluded: Boolean(message.contextIncluded),
-    attachmentLabelKey: message.attachmentLabelKey || ""
+    attachmentLabelKey: message.attachmentLabelKey || "",
+    attachmentCount: Number(message.attachmentCount) || 0
   };
 }
 
@@ -804,6 +831,7 @@ function normalizeStoredMessage(message) {
     timestamp: message?.timestamp || new Date().toISOString(),
     contextIncluded: Boolean(message?.contextIncluded),
     attachmentLabelKey: message?.attachmentLabelKey || "",
+    attachmentCount: Number(message?.attachmentCount) || 0,
     status: "done",
     id: message?.id
   });
@@ -954,6 +982,7 @@ function applyTranslations() {
   els["history-button"].title = t("history");
   els["settings-button"].setAttribute("aria-label", t("settings"));
   els["settings-button"].title = t("settings");
+  els["add-image-button"].textContent = t("addImage");
   els["refresh-tab-button"].textContent = t("syncPage");
   els["capture-visible-button"].textContent = t("captureVisible");
   els["capture-full-button"].textContent = t("captureFull");
@@ -1247,7 +1276,11 @@ function renderMessages() {
         notes.push(t("pageAttached"));
       }
       if (message.attachmentLabelKey) {
-        notes.push(t(message.attachmentLabelKey));
+        notes.push(
+          message.attachmentCount > 1
+            ? t("imagesAttached", { count: message.attachmentCount })
+            : t(message.attachmentLabelKey)
+        );
       }
 
       if (notes.length) {
@@ -1333,7 +1366,7 @@ async function startNewSession() {
   await persistSessionHistory();
   state.currentSessionId = createId("session");
   state.messages = [];
-  state.attachment = null;
+  state.attachments = [];
   state.pending = null;
   toggleTools(false);
   toggleHistory(false);
@@ -1354,7 +1387,7 @@ async function restoreSession(sessionId) {
   await persistSessionHistory();
   state.currentSessionId = target.id;
   state.messages = target.messages.map(normalizeMessage);
-  state.attachment = null;
+  state.attachments = [];
   state.pending = null;
   toggleTools(false);
   toggleHistory(false);
@@ -1381,7 +1414,7 @@ async function deleteSession(sessionId) {
     const nextSession = state.sessions[0] || null;
     state.currentSessionId = nextSession ? nextSession.id : createId("session");
     state.messages = nextSession ? nextSession.messages.map(normalizeMessage) : [];
-    state.attachment = null;
+    state.attachments = [];
     state.pending = null;
     renderMessages();
     renderAttachments();
@@ -1698,37 +1731,145 @@ function sanitizeMarkdownUrl(url) {
 function renderAttachments() {
   els["attachments"].innerHTML = "";
 
-  if (!state.attachment) {
+  if (!state.attachments.length) {
     return;
   }
 
-  const card = document.createElement("div");
-  card.className = "attachment-card";
+  for (const attachment of state.attachments) {
+    const card = document.createElement("div");
+    card.className = "attachment-card";
 
-  const meta = document.createElement("div");
-  meta.className = "attachment-meta";
+    const meta = document.createElement("div");
+    meta.className = "attachment-meta";
 
-  const title = document.createElement("strong");
-  title.textContent = t(state.attachment.labelKey);
+    const title = document.createElement("strong");
+    title.className = "attachment-title";
+    title.textContent = attachment.name || t(attachment.labelKey);
 
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "secondary-button";
-  remove.textContent = t("remove");
-  remove.addEventListener("click", () => {
-    state.attachment = null;
-    renderAttachments();
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "secondary-button";
+    remove.textContent = t("remove");
+    remove.addEventListener("click", () => {
+      state.attachments = state.attachments.filter((item) => item.id !== attachment.id);
+      renderAttachments();
+    });
+
+    meta.append(title, remove);
+
+    const image = document.createElement("img");
+    image.className = "attachment-preview";
+    image.src = attachment.dataUrl;
+    image.alt = attachment.name || t(attachment.labelKey);
+
+    card.append(meta, image);
+    els["attachments"].append(card);
+  }
+}
+
+function openImagePicker() {
+  els["image-input"].value = "";
+  els["image-input"].click();
+}
+
+async function handleImageInputChange(event) {
+  const files = Array.from(event.target.files || []);
+  event.target.value = "";
+
+  if (!files.length) {
+    return;
+  }
+
+  try {
+    await addAttachmentsFromFiles(files, "attachmentImage");
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+async function handlePromptPaste(event) {
+  const files = Array.from(event.clipboardData?.items || [])
+    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    .map((item) => item.getAsFile())
+    .filter(Boolean);
+
+  if (!files.length) {
+    return;
+  }
+
+  event.preventDefault();
+
+  try {
+    await addAttachmentsFromFiles(files, "attachmentPasted");
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : String(error), true);
+  }
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error(t("imageReadFailed")));
+    reader.readAsDataURL(file);
   });
+}
 
-  meta.append(title, remove);
+async function addAttachmentsFromFiles(files, labelKey = "attachmentImage") {
+  const imageFiles = files.filter((file) => file && String(file.type || "").startsWith("image/"));
+  if (!imageFiles.length) {
+    showNotice(t("imageOnlyNotice"), true);
+    return;
+  }
 
-  const image = document.createElement("img");
-  image.className = "attachment-preview";
-  image.src = state.attachment.dataUrl;
-  image.alt = t(state.attachment.labelKey);
+  const remainingSlots = Math.max(0, MAX_ATTACHMENTS - state.attachments.length);
+  if (!remainingSlots) {
+    showNotice(t("attachmentLimitNotice", { count: MAX_ATTACHMENTS }), true);
+    return;
+  }
 
-  card.append(meta, image);
-  els["attachments"].append(card);
+  const filesToAdd = imageFiles.slice(0, remainingSlots);
+  const attachments = await Promise.all(
+    filesToAdd.map(async (file) => ({
+      id: createId("attachment"),
+      kind: "image",
+      labelKey,
+      name: file.name || t(labelKey),
+      dataUrl: await fileToDataUrl(file)
+    }))
+  );
+
+  state.attachments = [...state.attachments, ...attachments];
+  renderAttachments();
+
+  showNotice(
+    attachments.length > 1
+      ? t("imagesAttached", { count: attachments.length })
+      : t("imageAttached")
+  );
+
+  if (imageFiles.length > filesToAdd.length) {
+    showNotice(t("attachmentLimitNotice", { count: MAX_ATTACHMENTS }), true);
+  }
+}
+
+function addDataUrlAttachment(dataUrl, labelKey) {
+  if (state.attachments.length >= MAX_ATTACHMENTS) {
+    state.attachments = state.attachments.slice(-(MAX_ATTACHMENTS - 1));
+  }
+
+  state.attachments = [
+    ...state.attachments,
+    {
+      id: createId("attachment"),
+      kind: "image",
+      labelKey,
+      name: t(labelKey),
+      dataUrl
+    }
+  ];
+
+  renderAttachments();
 }
 
 function buildMessageAvatar(role) {
@@ -1814,12 +1955,7 @@ async function captureScreenshot(mode) {
     return;
   }
 
-  state.attachment = {
-    kind: "image",
-    labelKey: mode === "full" ? "attachmentFull" : "attachmentVisible",
-    dataUrl: response.dataUrl
-  };
-  renderAttachments();
+  addDataUrlAttachment(response.dataUrl, mode === "full" ? "attachmentFull" : "attachmentVisible");
   toggleTools(false);
   showNotice(t("screenshotAttached"));
 }
@@ -1879,7 +2015,7 @@ async function sendPrompt() {
   }
 
   const prompt = els["prompt-input"].value.trim();
-  if (!prompt) {
+  if (!prompt && state.attachments.length === 0) {
     showNotice(t("writePromptNotice"), true);
     return;
   }
@@ -1895,14 +2031,14 @@ async function sendPrompt() {
   toggleHistory(false);
 
   try {
-    const userMessage = await buildUserMessage(prompt, state.settings.includeContextByDefault, state.attachment);
+    const userMessage = await buildUserMessage(prompt, state.settings.includeContextByDefault, state.attachments);
     appendMessage({
       ...userMessage,
       timestamp: new Date().toISOString()
     });
     els["prompt-input"].value = "";
     autoResizePrompt();
-    state.attachment = null;
+    state.attachments = [];
     renderAttachments();
 
     await runConversation(8);
@@ -1913,7 +2049,7 @@ async function sendPrompt() {
   }
 }
 
-async function buildUserMessage(prompt, includeContext, attachment) {
+async function buildUserMessage(prompt, includeContext, attachments) {
   let contextText = "";
 
   if (includeContext) {
@@ -1930,7 +2066,7 @@ async function buildUserMessage(prompt, includeContext, attachment) {
     }
   }
 
-  if (!attachment) {
+  if (!attachments?.length) {
     return {
       role: "user",
       content: prompt,
@@ -1939,26 +2075,33 @@ async function buildUserMessage(prompt, includeContext, attachment) {
     };
   }
 
-  const content = [{ type: "text", text: prompt }];
-  const modelContent = [{ type: "text", text: prompt }];
+  const content = [];
+  const modelContent = [];
+  if (prompt) {
+    content.push({ type: "text", text: prompt });
+    modelContent.push({ type: "text", text: prompt });
+  }
   if (contextText) {
     modelContent.push({ type: "text", text: `Current page summary:\n${contextText}` });
   }
-  const imagePart = {
-    type: "image_url",
-    image_url: {
-      url: attachment.dataUrl
-    }
-  };
-  content.push(imagePart);
-  modelContent.push(imagePart);
+  for (const attachment of attachments) {
+    const imagePart = {
+      type: "image_url",
+      image_url: {
+        url: attachment.dataUrl
+      }
+    };
+    content.push(imagePart);
+    modelContent.push(imagePart);
+  }
 
   return {
     role: "user",
     content,
     modelContent,
     contextIncluded: Boolean(contextText),
-    attachmentLabelKey: attachment.labelKey
+    attachmentLabelKey: attachments.length === 1 ? attachments[0].labelKey : "attachmentImage",
+    attachmentCount: attachments.length
   };
 }
 
@@ -2471,7 +2614,7 @@ function stripClientOnlyFields(message) {
     };
   }
 
-  const { timestamp, modelContent, contextIncluded, attachmentLabelKey, ...rest } = message;
+  const { timestamp, modelContent, contextIncluded, attachmentLabelKey, attachmentCount, ...rest } = message;
   if (typeof modelContent !== "undefined") {
     rest.content = modelContent;
   }
@@ -2523,6 +2666,7 @@ function autoResizePrompt() {
 function setBusy(isBusy) {
   state.isBusy = isBusy;
   els["send-button"].disabled = isBusy;
+  els["add-image-button"].disabled = isBusy;
   els["capture-visible-button"].disabled = isBusy;
   els["capture-full-button"].disabled = isBusy;
   els["console-logs-button"].disabled = isBusy;

@@ -835,6 +835,10 @@ select {
   border: 1px solid var(--border);
 }
 
+.message-body img:first-child {
+  margin-top: 0;
+}
+
 .composer {
   flex: 0 0 auto;
   display: flex;
@@ -855,6 +859,14 @@ select {
   display: none;
 }
 
+.hidden-file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .attachment-card {
   min-width: 136px;
   max-width: 168px;
@@ -872,6 +884,13 @@ select {
   gap: 8px;
   margin-bottom: 8px;
   font-size: 12px;
+}
+
+.attachment-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .attachment-preview {
