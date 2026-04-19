@@ -93,7 +93,7 @@ No build step is required.
 4. Select this folder:
 
    ```text
-   /Users/luccazh/Documents/Programing☕️/GPT in Chrome
+   /path/to/GPT in Chrome
    ```
 
 5. Pin the extension if you want quick access
@@ -281,7 +281,7 @@ GPT in Chrome 是一个运行在 Chrome 侧边栏里的 AI 助手，支持接入
 4. 选择这个目录：
 
    ```text
-   /Users/luccazh/Documents/Programing☕️/GPT in Chrome
+   /path/to/GPT in Chrome
    ```
 
 5. 建议把扩展固定到工具栏
@@ -384,4 +384,3 @@ GPT in Chrome 是一个运行在 Chrome 侧边栏里的 AI 助手，支持接入
 - Claude 官方产品
 - Anthropic 官方项目
 - 只支持单一 API 厂商的扩展
-
